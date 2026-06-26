@@ -1,0 +1,2055 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>旅行プランナー</title>
+  <meta name="theme-color" content="#38bdf8">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+ 
+  <style>
+    :root {
+      --c-bg:        #f0f4f8;
+      --c-surface:   #ffffff;
+      --c-border:    #e2e8f0;
+      --c-text:      #1e293b;
+      --c-muted:     #64748b;
+      --c-primary:   #0ea5e9;
+      --c-primary-d: #0284c7;
+      --c-green:     #10b981;
+      --c-red:       #ef4444;
+      --c-orange:    #f59e0b;
+      --c-yellow-bg: #fefce8;
+      --radius-sm:   6px;
+      --radius-md:   12px;
+      --radius-lg:   18px;
+      --shadow-sm:   0 1px 3px rgba(0,0,0,.08);
+      --shadow-md:   0 4px 12px rgba(0,0,0,.10);
+      --shadow-lg:   0 8px 24px rgba(0,0,0,.14);
+      --font:        'Noto Sans JP', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font);
+      background: var(--c-bg);
+      color: var(--c-text);
+      display: flex;
+      justify-content: center;
+      min-height: 100dvh;
+    }
+    a { color: var(--c-primary); }
+    .app-shell {
+      width: 100%;
+      max-width: 480px;
+      min-height: 100dvh;
+      background: var(--c-surface);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      box-shadow: var(--shadow-lg);
+    }
+    .screen { display: none; flex-direction: column; flex: 1; height: 100dvh; }
+    .screen.active { display: flex; }
+    .loading-overlay {
+      position: fixed; inset: 0;
+      background: rgba(255,255,255,.75);
+      backdrop-filter: blur(3px);
+      display: none; justify-content: center; align-items: center;
+      z-index: 200; flex-direction: column; gap: 12px;
+    }
+    .loading-overlay.active { display: flex; }
+    .spinner {
+      width: 36px; height: 36px; border-radius: 50%;
+      border: 3px solid var(--c-border);
+      border-top-color: var(--c-primary);
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { font-size: 13px; color: var(--c-muted); }
+    #toast-container {
+      position: fixed; bottom: 80px; left: 50%;
+      transform: translateX(-50%);
+      display: flex; flex-direction: column; gap: 8px;
+      z-index: 300; pointer-events: none;
+      width: min(90%, 400px);
+    }
+    .toast {
+      padding: 12px 16px; border-radius: var(--radius-md);
+      font-size: 14px; font-weight: 500;
+      box-shadow: var(--shadow-md);
+      animation: toastIn .25s ease forwards;
+      pointer-events: all;
+    }
+    .toast.success { background: #dcfce7; color: #166534; border-left: 4px solid var(--c-green); }
+    .toast.error   { background: #fee2e2; color: #991b1b; border-left: 4px solid var(--c-red); }
+    .toast.info    { background: #e0f2fe; color: #0c4a6e; border-left: 4px solid var(--c-primary); }
+    .toast.warning { background: #fef9c3; color: #713f12; border-left: 4px solid var(--c-orange); }
+    .toast.fade-out { animation: toastOut .3s ease forwards; }
+    @keyframes toastIn  { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes toastOut { to   { opacity:0; transform:translateY(10px); } }
+    .form-label { font-size: 12px; color: var(--c-muted); font-weight: 500; display: block; margin-bottom: 4px; }
+    .form-group { margin-bottom: 14px; }
+    input[type="text"],
+    input[type="password"],
+    input[type="time"],
+    input[type="number"],
+    input[type="datetime-local"],
+    select {
+      width: 100%; padding: 11px 14px;
+      border: 1.5px solid var(--c-border);
+      border-radius: var(--radius-sm);
+      font-size: 15px; font-family: var(--font);
+      background: var(--c-surface); color: var(--c-text);
+      outline: none; transition: border-color .15s;
+    }
+    input:focus, select:focus { border-color: var(--c-primary); }
+    .btn {
+      display: inline-flex; justify-content: center; align-items: center; gap: 6px;
+      padding: 11px 18px; border: none; border-radius: var(--radius-sm);
+      font-size: 15px; font-family: var(--font); font-weight: 600;
+      cursor: pointer; transition: filter .15s, transform .1s;
+      text-decoration: none; white-space: nowrap;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn:hover  { filter: brightness(1.07); }
+    .btn-primary  { background: var(--c-primary);  color: #fff; width: 100%; }
+    .btn-success  { background: var(--c-green);    color: #fff; width: 100%; }
+    .btn-danger   { background: var(--c-red);      color: #fff; }
+    .btn-neutral  { background: #94a3b8;            color: #fff; width: 100%; }
+    .btn-outline-danger {
+      background: transparent; color: var(--c-red);
+      border: 1.5px solid var(--c-red);
+      padding: 4px 10px; font-size: 12px; border-radius: var(--radius-sm);
+    }
+    .btn-ghost  {
+      background: none; border: none; color: var(--c-muted);
+      padding: 4px 8px; font-size: 20px; cursor: pointer; width: auto;
+    }
+    .btn-sm { padding: 5px 12px; font-size: 12px; width: auto; }
+    .btn-fab {
+      position: absolute; right: 18px; bottom: 76px;
+      width: 54px; height: 54px; border-radius: 50%;
+      background: var(--c-primary); color: #fff;
+      border: none; font-size: 26px; cursor: pointer;
+      box-shadow: 0 4px 14px rgba(14,165,233,.45);
+      display: flex; justify-content: center; align-items: center;
+      z-index: 10; transition: transform .15s, box-shadow .15s;
+    }
+    .btn-fab:hover  { transform: scale(1.08); box-shadow: 0 6px 20px rgba(14,165,233,.55); }
+    .btn-fab:active { transform: scale(.95); }
+    .btn-row { display: flex; gap: 8px; }
+    .btn-row .btn { flex: 1; }
+    .modal {
+      display: none; position: absolute; inset: 0;
+      background: rgba(15,23,42,.5); backdrop-filter: blur(2px);
+      justify-content: center; align-items: center; z-index: 100;
+    }
+    .modal.active { display: flex; }
+    .modal-content {
+      background: var(--c-surface); border-radius: var(--radius-lg);
+      padding: 22px; width: 88%; max-height: 85dvh; overflow-y: auto;
+      box-shadow: var(--shadow-lg);
+    }
+    .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 16px; }
+    #screen-login {
+      justify-content: center; padding: 32px 24px;
+      background: linear-gradient(160deg, #0ea5e9 0%, #0f172a 100%);
+    }
+    .login-card {
+      background: #fff; border-radius: var(--radius-lg);
+      padding: 28px 22px; box-shadow: var(--shadow-lg);
+    }
+    .login-logo { text-align: center; margin-bottom: 20px; }
+    .login-logo .icon { font-size: 42px; }
+    .login-logo h1 { font-size: 22px; font-weight: 700; color: var(--c-text); margin-top: 6px; }
+    .forgot-link { font-size: 12px; color: var(--c-primary); text-align: right; cursor: pointer; margin-bottom: 4px; }
+    #screen-group { overflow: hidden; }
+    .group-header {
+      padding: 16px 18px 12px;
+      border-bottom: 1px solid var(--c-border);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .group-header h2 { font-size: 20px; font-weight: 700; }
+    .user-chip { display: flex; align-items: center; gap: 8px; }
+    .user-chip span { font-size: 13px; color: var(--c-muted); }
+    .group-list { flex: 1; overflow-y: auto; padding: 12px 16px 80px; }
+    .group-item {
+      background: var(--c-surface); border: 1px solid var(--c-border);
+      border-radius: var(--radius-md); padding: 14px 16px; margin-bottom: 10px;
+      display: flex; align-items: center; box-shadow: var(--shadow-sm);
+      transition: box-shadow .15s;
+    }
+    .group-item:hover { box-shadow: var(--shadow-md); }
+    .group-item-body { flex: 1; cursor: pointer; padding-right: 8px; word-break: break-all; }
+    .group-item-name { font-weight: 700; font-size: 15px; }
+    .group-item-meta { font-size: 12px; color: var(--c-muted); margin-top: 2px; }
+    .guide-card {
+      text-align: center; background: #f8fafc;
+      border: 2px dashed var(--c-border); border-radius: var(--radius-lg);
+      padding: 32px 20px; margin-top: 24px; color: var(--c-muted);
+    }
+    .guide-icon { font-size: 42px; margin-bottom: 12px; animation: float 3s ease-in-out infinite; }
+    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
+    .guide-title { font-weight: 700; font-size: 16px; color: var(--c-text); margin-bottom: 8px; }
+    .guide-desc  { font-size: 13px; line-height: 1.7; }
+    #screen-main { overflow: hidden; }
+    .main-header {
+      padding: 12px 16px; border-bottom: 1px solid var(--c-border);
+      display: flex; justify-content: center; align-items: center; position: relative;
+      min-height: 52px;
+    }
+    .back-btn {
+      position: absolute; left: 12px;
+      font-size: 13px; color: var(--c-primary); cursor: pointer;
+      padding: 4px 6px;
+    }
+    .header-title-wrap { display: flex; align-items: center; gap: 2px; }
+    .header-title-wrap h3 { font-size: 17px; font-weight: 700; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .main-content { flex: 1; overflow-y: auto; padding: 12px 16px 80px; position: relative; }
+    .tab-bar {
+      display: flex; border-top: 1px solid var(--c-border);
+      background: var(--c-surface);
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    .tab-item {
+      flex: 1; text-align: center; padding: 14px 0;
+      cursor: pointer; font-size: 13px; color: var(--c-muted);
+      transition: color .15s, border-top .15s;
+      border-top: 3px solid transparent;
+    }
+    .tab-item.active {
+      color: var(--c-primary); font-weight: 700;
+      border-top-color: var(--c-primary);
+    }
+    .tab-icon { font-size: 16px; display: block; margin-bottom: 2px; }
+    .list-item {
+      background: var(--c-surface); border: 1px solid var(--c-border);
+      border-radius: var(--radius-md); padding: 12px 14px;
+      margin-bottom: 8px; display: flex; align-items: center; gap: 10px;
+      border-left: 4px solid var(--c-primary); box-shadow: var(--shadow-sm);
+    }
+    .item-data { flex: 1; font-size: 14px; word-break: break-all; }
+    .item-time { font-weight: 700; color: var(--c-primary); margin-right: 8px; }
+    .day-header {
+      background: #1e293b; color: #fff;
+      padding: 5px 12px; border-radius: var(--radius-sm);
+      font-size: 12px; font-weight: 700; margin: 16px 0 8px;
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+    .calendar-view { margin-bottom: 12px; }
+    .cal-day-block {
+      background: #f8fafc; border: 1px solid var(--c-border);
+      border-radius: var(--radius-md); margin-bottom: 12px; overflow: hidden;
+    }
+    .cal-day-header {
+      background: linear-gradient(90deg, var(--c-primary) 0%, var(--c-primary-d) 100%);
+      color: #fff; padding: 8px 14px;
+      font-size: 13px; font-weight: 700;
+    }
+    .cal-events { padding: 8px 12px; }
+    .cal-event-row {
+      display: flex; gap: 10px; align-items: flex-start;
+      padding: 7px 0; border-bottom: 1px solid var(--c-border);
+      position: relative;
+    }
+    .cal-event-row:last-child { border-bottom: none; }
+    .cal-event-time { font-size: 12px; font-weight: 700; color: var(--c-primary); min-width: 40px; padding-top: 1px; }
+    .cal-event-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c-primary); margin-top: 5px; flex-shrink: 0; }
+    .cal-event-text { flex: 1; font-size: 14px; }
+    .cal-event-actions { display: flex; gap: 4px; flex-shrink: 0; }
+    .cal-event-btn {
+      background: none; border: none; font-size: 13px; cursor: pointer;
+      color: var(--c-muted); padding: 2px 4px; border-radius: 4px;
+      transition: background .15s;
+    }
+    .cal-event-btn:hover { background: var(--c-border); }
+    .btn-like {
+      background: #fff; color: #94a3b8;
+      border: 1.5px solid var(--c-border);
+      padding: 5px 0; font-size: 13px;
+      border-radius: 20px; width: 54px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; gap: 3px;
+      cursor: pointer; transition: all .15s;
+    }
+    .btn-like:hover  { border-color: #fca5a5; color: #f43f5e; }
+    .btn-like.liked  { background: #fff1f2; color: #f43f5e; border-color: #fecdd3; font-weight: 700; }
+    .btn-like:active { transform: scale(.93); }
+    .spot-map-btn {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 11px; color: var(--c-primary); text-decoration: none;
+      background: #e0f2fe; padding: 3px 8px; border-radius: 20px; margin-top: 4px;
+    }
+    .money-summary {
+      background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+      color: #fff; border-radius: var(--radius-md);
+      padding: 16px; margin-bottom: 14px;
+    }
+    .money-summary-row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
+    .money-summary-total { font-size: 22px; font-weight: 700; }
+    .money-member-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px;
+    }
+    .money-member-card {
+      background: var(--c-surface); border: 1px solid var(--c-border);
+      border-radius: var(--radius-sm); padding: 10px 12px; box-shadow: var(--shadow-sm);
+    }
+    .money-member-name { font-size: 12px; color: var(--c-muted); margin-bottom: 2px; }
+    .money-member-paid { font-size: 14px; font-weight: 700; }
+    .money-member-diff { font-size: 12px; font-weight: 700; margin-top: 2px; }
+    .diff-positive { color: var(--c-green); }
+    .diff-negative { color: var(--c-red); }
+    .settlement-graph {
+      background: var(--c-surface); border: 1px solid var(--c-border);
+      border-radius: var(--radius-md); padding: 14px; margin-bottom: 14px;
+    }
+    .settlement-graph-title { font-size: 13px; font-weight: 700; margin-bottom: 10px; color: var(--c-text); }
+    .settlement-route {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 10px; background: #f8fafc;
+      border-radius: var(--radius-sm); margin-bottom: 6px;
+      border-left: 3px solid var(--c-green);
+    }
+    .settlement-from { font-size: 13px; font-weight: 700; color: var(--c-red); }
+    .settlement-arrow { color: var(--c-muted); font-size: 16px; flex-shrink: 0; }
+    .settlement-to   { font-size: 13px; font-weight: 700; color: var(--c-green); }
+    .settlement-amount { margin-left: auto; font-size: 14px; font-weight: 700; color: #0284c7; }
+    .menu-container { position: relative; }
+    .dropdown-menu {
+      display: none; position: absolute; right: 0; top: 28px;
+      background: var(--c-surface); border: 1px solid var(--c-border);
+      border-radius: var(--radius-sm); box-shadow: var(--shadow-md);
+      z-index: 50; min-width: 90px; overflow: hidden;
+    }
+    .dropdown-menu.show { display: block; }
+    .dropdown-menu div {
+      padding: 9px 14px; font-size: 13px; cursor: pointer; transition: background .1s;
+    }
+    .dropdown-menu div:hover { background: var(--c-bg); }
+    .menu-delete { color: var(--c-red); }
+    .poll-card {
+      background: #f8fafc; border: 1px solid var(--c-border);
+      border-radius: var(--radius-md); padding: 16px;
+      margin-bottom: 14px; border-top: 4px solid var(--c-primary);
+    }
+    .poll-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+    .poll-desc  { font-size: 12px; color: var(--c-muted); margin-bottom: 12px; }
+    .poll-deadline { font-size: 12px; font-weight: 700; margin-bottom: 12px; }
+    .poll-deadline.expired { color: var(--c-red); }
+    .poll-deadline.active  { color: var(--c-green); }
+    .poll-deadline.none    { color: var(--c-muted); }
+    .poll-option {
+      background: var(--c-surface); border: 1.5px solid var(--c-border);
+      border-radius: var(--radius-sm); padding: 10px 12px;
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 8px; gap: 8px;
+    }
+    .poll-option.voted { border-color: var(--c-green); background: #f0fdf4; }
+    .poll-option-info { flex: 1; }
+    .poll-option-name  { font-size: 14px; font-weight: 600; word-break: break-all; }
+    .poll-option-votes { font-size: 12px; color: var(--c-primary); font-weight: 700; margin-top: 2px; }
+    .poll-option-bar {
+      height: 4px; background: var(--c-border); border-radius: 2px; margin-top: 6px; overflow: hidden;
+    }
+    .poll-option-bar-fill { height: 100%; background: var(--c-primary); border-radius: 2px; transition: width .4s; }
+    .poll-option-actions { display: flex; gap: 4px; flex-shrink: 0; }
+    .poll-section-label { font-size: 11px; font-weight: 700; color: var(--c-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .05em; }
+    .poll-row { display: flex; gap: 6px; margin-bottom: 10px; }
+    .poll-row input { flex: 1; margin: 0; }
+    .poll-separator { border: none; border-top: 1px dashed var(--c-border); margin: 14px 0; }
+    .status-bar {
+      display: flex; gap: 8px; background: var(--c-surface);
+      border: 1px solid var(--c-border); border-radius: var(--radius-md);
+      padding: 10px; margin-bottom: 14px; box-shadow: var(--shadow-sm);
+    }
+    .status-cell { flex: 1; text-align: center; }
+    .status-cell-label { font-size: 11px; color: var(--c-muted); }
+    .status-cell-value { font-size: 12px; font-weight: 700; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .status-active   { color: var(--c-primary); }
+    .status-waiting  { color: var(--c-muted); }
+    .status-done     { color: var(--c-green); }
+    .status-divider  { width: 1px; background: var(--c-border); margin: 2px 0; }
+    .confirmed-banner {
+      background: #eff6ff; border: 1px solid #bfdbfe;
+      border-left: 4px solid #3b82f6; border-radius: var(--radius-sm);
+      padding: 10px 12px; font-size: 12px; margin-bottom: 10px;
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    }
+    .member-tag-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+    .member-tag {
+      background: #e0f2fe; padding: 4px 10px; border-radius: 20px;
+      font-size: 13px; display: flex; align-items: center; gap: 5px;
+    }
+    .btn-del-member {
+      background: none; border: none; color: var(--c-red); cursor: pointer;
+      font-size: 14px; line-height: 1; padding: 0;
+    }
+    #screen-reset {
+      justify-content: center; padding: 32px 24px;
+      background: linear-gradient(160deg, #0ea5e9 0%, #0f172a 100%);
+    }
+    .reset-card {
+      background: #fff; border-radius: var(--radius-lg);
+      padding: 28px 22px; box-shadow: var(--shadow-lg);
+    }
+    .empty-state { text-align: center; padding: 40px 20px; color: var(--c-muted); font-size: 13px; }
+    .mt-8  { margin-top: 8px; }
+    .mt-12 { margin-top: 12px; }
+    .mt-16 { margin-top: 16px; }
+    .text-sm { font-size: 13px; }
+    .text-muted { color: var(--c-muted); }
+    .text-center { text-align: center; }
+    .divider { border: none; border-top: 1px solid var(--c-border); margin: 16px 0; }
+
+    /* ===== 割り勘UI 追加スタイル ===== */
+    .split-mode-toggle {
+      display: flex; gap: 0; margin-bottom: 12px;
+      border: 1.5px solid var(--c-border); border-radius: var(--radius-sm); overflow: hidden;
+    }
+    .split-mode-btn {
+      flex: 1; padding: 9px 6px; border: none; background: var(--c-bg);
+      font-family: var(--font); font-size: 13px; font-weight: 600;
+      cursor: pointer; color: var(--c-muted); transition: background .15s, color .15s;
+    }
+    .split-mode-btn.active {
+      background: var(--c-primary); color: #fff;
+    }
+    .split-even-section, .split-manual-section { display: none; }
+    .split-even-section.visible, .split-manual-section.visible { display: block; }
+
+    /* 均等割り チェックボックスリスト */
+    .split-member-list {
+      border: 1.5px solid var(--c-border); border-radius: var(--radius-sm);
+      overflow: hidden; margin-bottom: 8px;
+    }
+    .split-member-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 12px; border-bottom: 1px solid var(--c-border);
+      cursor: pointer; transition: background .1s;
+    }
+    .split-member-row:last-child { border-bottom: none; }
+    .split-member-row:hover { background: #f8fafc; }
+    .split-member-row input[type="checkbox"] {
+      width: 16px; height: 16px; accent-color: var(--c-primary);
+      cursor: pointer; flex-shrink: 0;
+    }
+    .split-member-label { flex: 1; font-size: 14px; }
+    .split-member-share { font-size: 12px; font-weight: 700; color: var(--c-primary); margin-left: auto; }
+    .split-even-preview {
+      background: #f0f9ff; border: 1px solid #bae6fd;
+      border-radius: var(--radius-sm); padding: 8px 12px;
+      font-size: 12px; color: #0369a1; margin-top: 6px;
+    }
+
+    /* 手動割り 入力リスト */
+    .split-manual-row {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 8px;
+    }
+    .split-manual-row label { font-size: 13px; min-width: 72px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .split-manual-row input[type="number"] {
+      flex: 1; padding: 8px 10px; font-size: 14px;
+      border: 1.5px solid var(--c-border); border-radius: var(--radius-sm);
+      width: auto;
+    }
+    .split-manual-row .yen-label { font-size: 13px; color: var(--c-muted); flex-shrink: 0; }
+    .split-manual-total {
+      background: #f0fdf4; border: 1px solid #bbf7d0;
+      border-radius: var(--radius-sm); padding: 8px 12px;
+      font-size: 13px; margin-top: 4px; display: flex; justify-content: space-between;
+    }
+    .split-manual-total .total-ok  { color: var(--c-green); font-weight: 700; }
+    .split-manual-total .total-ng  { color: var(--c-red); font-weight: 700; }
+
+    /* 支払い履歴カードの割り勘内訳 */
+    .split-detail-badge {
+      display: inline-flex; align-items: center; gap: 3px;
+      background: #f0f9ff; border: 1px solid #bae6fd;
+      border-radius: 20px; padding: 2px 8px;
+      font-size: 11px; color: #0369a1; margin: 2px 2px 0 0;
+    }
+  </style>
+</head>
+<body>
+ 
+<div class="app-shell" id="app-shell">
+ 
+  <div id="loading" class="loading-overlay" aria-live="polite" aria-label="通信中">
+    <div class="spinner"></div>
+    <span class="loading-text">通信中...</span>
+  </div>
+ 
+  <div id="toast-container" aria-live="assertive"></div>
+ 
+  <div id="screen-login" class="screen active" role="main">
+    <div class="login-card">
+      <div class="login-logo">
+        <div class="icon">✈️</div>
+        <h1>旅行プランナー</h1>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="input-login-email">メールアドレス</label>
+        <input type="text" id="input-login-email" placeholder="example@email.com" autocomplete="email" inputmode="email">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="input-login-password">パスワード</label>
+        <input type="password" id="input-login-password" placeholder="6文字以上" autocomplete="current-password">
+      </div>
+      <div class="forgot-link" id="btn-forgot">パスワードを忘れた場合は再設定 →</div>
+      <button class="btn btn-primary mt-8" id="btn-login">ログイン</button>
+      <div class="divider" style="margin:16px 0;"></div>
+      <button class="btn btn-success" id="btn-go-register">新規登録はこちら</button>
+    </div>
+  </div>
+ 
+  <div id="screen-register" class="screen" role="main">
+    <div class="login-card">
+      <div class="login-logo">
+        <div class="icon">✈️</div>
+        <h1>新規登録</h1>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="input-reg-email">メールアドレス</label>
+        <input type="text" id="input-reg-email" placeholder="example@email.com" autocomplete="email" inputmode="email">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="input-reg-password">パスワード（6文字以上）</label>
+        <input type="password" id="input-reg-password" placeholder="6文字以上" autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="input-reg-password2">パスワード（確認）</label>
+        <input type="password" id="input-reg-password2" placeholder="もう一度入力" autocomplete="new-password">
+      </div>
+      <button class="btn btn-success mt-8" id="btn-register">登録する</button>
+      <button class="btn btn-neutral mt-8" id="btn-back-to-login-from-register">← ログインに戻る</button>
+    </div>
+  </div>
+ 
+  <div id="screen-setup-name" class="screen" role="main">
+    <div class="login-card">
+      <div class="login-logo">
+        <div class="icon">👤</div>
+        <h1>ユーザー名の設定</h1>
+      </div>
+      <p style="font-size:13px;color:var(--c-muted);margin-bottom:16px;line-height:1.7;">
+        グループ内で表示される名前を設定してください。<br>
+        あとから設定画面で変更できます。他の人と同じ名前でもOKです。
+      </p>
+      <div class="form-group">
+        <label class="form-label" for="input-setup-name">ユーザー名</label>
+        <input type="text" id="input-setup-name" placeholder="例: たろう、Taro など" autocomplete="nickname" maxlength="20">
+      </div>
+      <button class="btn btn-primary mt-8" id="btn-save-name">この名前で始める</button>
+    </div>
+  </div>
+ 
+  <div id="screen-reset" class="screen" role="main">
+    <div class="reset-card">
+      <h2 style="font-size:18px;font-weight:700;margin-bottom:8px;">パスワードの再設定</h2>
+      <p style="font-size:13px;color:var(--c-muted);margin-bottom:16px;">
+        登録したメールアドレスにリセット用のメールを送ります。
+      </p>
+      <div class="form-group">
+        <label class="form-label">メールアドレス</label>
+        <input type="text" id="input-reset-email" placeholder="登録したメールアドレス" inputmode="email">
+      </div>
+      <button class="btn btn-primary" id="btn-send-reset">リセットメールを送る</button>
+      <button class="btn btn-neutral mt-8" id="btn-back-to-login">← ログインに戻る</button>
+    </div>
+  </div>
+ 
+  <div id="screen-group" class="screen">
+    <div class="group-header">
+      <h2>🗺 グループ</h2>
+      <div class="user-chip">
+        <span id="txt-user-status">…さん</span>
+        <button class="btn btn-outline-danger btn-sm" id="btn-logout">ログアウト</button>
+      </div>
+    </div>
+    <div class="group-list" id="group-container"></div>
+    <button class="btn-fab" id="btn-open-create-group" aria-label="グループを作成">＋</button>
+  </div>
+ 
+  <div id="group-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-create-title">
+    <div class="modal-content">
+      <p class="modal-title" id="modal-create-title">グループ作成</p>
+      <div class="form-group">
+        <label class="form-label">グループ名</label>
+        <input type="text" id="new-group-name" placeholder="例: 夏の沖縄旅行">
+      </div>
+      <div class="form-group">
+        <label class="form-label">仮メンバーを追加（メモ用）</label>
+        <div style="display:flex;gap:6px;">
+          <input type="text" id="create-member-name-input" placeholder="名前を入力" style="margin:0;flex:1;">
+          <button class="btn btn-primary btn-sm" id="btn-add-member-create">追加</button>
+        </div>
+        <div class="member-tag-list" id="create-member-list"></div>
+      </div>
+      <button class="btn btn-success mt-12" id="btn-create-group">作成する</button>
+      <button class="btn btn-neutral mt-8" id="btn-cancel-create-group">キャンセル</button>
+    </div>
+  </div>
+ 
+  <div id="group-edit-modal" class="modal" role="dialog" aria-modal="true">
+    <div class="modal-content">
+      <p class="modal-title">グループ名の編集</p>
+      <input type="hidden" id="edit-group-id">
+      <div class="form-group">
+        <label class="form-label">新しいグループ名</label>
+        <input type="text" id="input-edit-group-name">
+      </div>
+      <button class="btn btn-success" id="btn-save-group-edit">変更を保存</button>
+      <button class="btn btn-neutral mt-8" id="btn-close-group-edit">キャンセル</button>
+    </div>
+  </div>
+ 
+  <div id="screen-main" class="screen">
+    <div class="main-header">
+      <span class="back-btn" id="btn-back" role="button" tabindex="0" aria-label="グループ一覧に戻る">← 戻る</span>
+      <div class="header-title-wrap">
+        <h3 id="current-group-title">グループ名</h3>
+        <div class="menu-container">
+          <button class="btn-ghost" id="btn-header-menu" aria-label="グループメニュー">⋮</button>
+          <div class="dropdown-menu" id="menu-header">
+            <div id="btn-open-group-settings">グループ設定</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="main-content" id="main-content-area"></div>
+    <button class="btn-fab" id="btn-add-item" aria-label="項目を追加">＋</button>
+    <nav class="tab-bar" aria-label="タブ">
+      <div class="tab-item active" id="tab-shiori" role="tab" tabindex="0" aria-selected="true">
+        <span class="tab-icon">📅</span>しおり
+      </div>
+      <div class="tab-item" id="tab-yukisaki" role="tab" tabindex="0" aria-selected="false">
+        <span class="tab-icon">📍</span>行き先
+      </div>
+      <div class="tab-item" id="tab-okane" role="tab" tabindex="0" aria-selected="false">
+        <span class="tab-icon">💰</span>お金
+      </div>
+    </nav>
+  </div>
+ 
+  <div id="group-settings-modal" class="modal" role="dialog" aria-modal="true">
+    <div class="modal-content">
+      <p class="modal-title">グループの設定</p>
+      <div class="form-group">
+        <label class="form-label">グループ名</label>
+        <input type="text" id="edit-group-name-input">
+      </div>
+      <div class="form-group">
+        <label class="form-label">仮メンバーの追加</label>
+        <div style="display:flex;gap:6px;">
+          <input type="text" id="new-member-name-input" placeholder="名前を入力" style="margin:0;flex:1;">
+          <button class="btn btn-primary btn-sm" id="btn-add-member-settings">追加</button>
+        </div>
+        <div class="member-tag-list" id="modal-member-list"></div>
+      </div>
+      <button class="btn btn-primary btn-sm" id="btn-copy-invite" style="width:100%;background:#f59e0b;margin-bottom:6px;">
+        📤 LINE等で友達を招待 (URLコピー)
+      </button>
+      <hr class="divider">
+      <button class="btn btn-success" id="btn-save-group-settings">設定を保存する</button>
+      <button class="btn btn-neutral mt-8" id="btn-close-group-settings">閉じる</button>
+    </div>
+  </div>
+ 
+  <div id="item-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="item-modal-title">
+    <div class="modal-content">
+      <p class="modal-title" id="item-modal-title">項目を追加</p>
+      <input type="hidden" id="edit-id">
+ 
+      <div id="form-shiori" class="modal-form">
+        <div class="form-group">
+          <label class="form-label" for="input-shiori-day">日程</label>
+          <select id="input-shiori-day">
+            <option value="1">1日目</option><option value="2">2日目</option>
+            <option value="3">3日目</option><option value="4">4日目</option>
+            <option value="5">5日目</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="input-time">時刻</label>
+          <input type="time" id="input-time" value="10:00">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="input-shiori-text">内容</label>
+          <input type="text" id="input-shiori-text" placeholder="例: 〇〇駅集合">
+        </div>
+      </div>
+ 
+      <div id="form-yukisaki" class="modal-form" style="display:none;">
+        <div class="form-group">
+          <label class="form-label" for="input-spot-name">スポット名</label>
+          <input type="text" id="input-spot-name" placeholder="行きたい場所・スポット名">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="input-spot-url">参考URL（任意）</label>
+          <input type="text" id="input-spot-url" placeholder="https://...">
+        </div>
+      </div>
+
+      <!-- ===== お金フォーム（新バージョン） ===== -->
+      <div id="form-okane" class="modal-form" style="display:none;">
+        <div class="form-group">
+          <label class="form-label">支払った人</label>
+          <select id="input-money-name"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="input-money-amount">合計金額（円）</label>
+          <input type="number" id="input-money-amount" placeholder="例: 5000" min="0">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="input-money-text">内容</label>
+          <input type="text" id="input-money-text" placeholder="例: レンタカー代">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">割り勘の方法</label>
+          <div class="split-mode-toggle">
+            <button class="split-mode-btn active" id="btn-split-even" type="button">✅ 均等割り（対象者を選ぶ）</button>
+            <button class="split-mode-btn" id="btn-split-manual" type="button">✏️ 手動入力（金額を個別指定）</button>
+          </div>
+
+          <!-- 均等割りセクション -->
+          <div class="split-even-section visible" id="split-even-section">
+            <div class="poll-section-label">割り勘の対象者にチェック</div>
+            <div class="split-member-list" id="split-member-checkboxes"></div>
+            <div class="split-even-preview" id="split-even-preview">対象者を選んでください</div>
+          </div>
+
+          <!-- 手動入力セクション -->
+          <div class="split-manual-section" id="split-manual-section">
+            <div class="poll-section-label">各自の負担額を入力（合計が総額と一致するように）</div>
+            <div id="split-manual-inputs"></div>
+            <div class="split-manual-total" id="split-manual-total">
+              <span>入力合計</span><span>—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- ===== /お金フォーム ===== -->
+ 
+      <button class="btn btn-success mt-12" id="btn-save-item">保存する</button>
+      <button class="btn btn-neutral mt-8" id="btn-cancel-item">キャンセル</button>
+    </div>
+  </div>
+ 
+</div>
+
+<script type="module">
+import { initializeApp }         from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signOut,
+         signInWithEmailAndPassword, createUserWithEmailAndPassword,
+         sendPasswordResetEmail }
+         from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, doc, setDoc, getDoc, updateDoc, deleteDoc,
+         collection, query, where, onSnapshot, arrayUnion }
+         from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+ 
+const firebaseConfig = {
+  apiKey: "AIzaSyC_tErN9-D_rd_d4Aqtj8Z7l85rh2voLHk",
+  authDomain: "togeritan.firebaseapp.com",
+  projectId: "togeritan",
+  storageBucket: "togeritan.firebasestorage.app",
+  messagingSenderId: "604693733583",
+  appId: "1:604693733583:web:884e3cc3e577f551ebd7ba",
+  measurementId: "G-7VX5BM6XJ0"
+};
+ 
+const app  = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db   = getFirestore(app);
+ 
+let myUID          = "";
+let loginUserName  = "";
+let currentGroupId = "";
+let currentTab     = "しおり";
+let createTempMembers = [];
+let tempMembers    = {};
+let currentGroupData = null;
+let groupListUnsubscribe  = null;
+let activeGroupUnsubscribe = null;
+let splitMode = 'even'; // 'even' | 'manual'
+ 
+const urlParams    = new URLSearchParams(window.location.search);
+const inviteGroupId = urlParams.get('join');
+
+/* ===== PWA manifest ===== */
+(function injectManifest() {
+  const manifest = {
+    name: "旅行プランナー", short_name: "旅プラン",
+    description: "グループで一緒に旅行計画を立てるアプリ",
+    start_url: "./", display: "standalone",
+    background_color: "#0f172a", theme_color: "#38bdf8", orientation: "portrait",
+    icons: [
+      { src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='36' fill='%230ea5e9'/%3E%3Ctext x='96' y='130' font-size='110' text-anchor='middle'%3E✈️%3C/text%3E%3C/svg%3E", sizes: "192x192", type: "image/svg+xml", purpose: "any maskable" },
+      { src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='96' fill='%230ea5e9'/%3E%3Ctext x='256' y='350' font-size='300' text-anchor='middle'%3E✈️%3C/text%3E%3C/svg%3E", sizes: "512x512", type: "image/svg+xml", purpose: "any maskable" }
+    ]
+  };
+  const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+  const link = document.createElement('link');
+  link.rel = 'manifest'; link.href = URL.createObjectURL(blob);
+  document.head.appendChild(link);
+})();
+
+if ('serviceWorker' in navigator) {
+  const swCode = `
+const CACHE_NAME = 'trip-planner-v2';
+self.addEventListener('install', (e) => { self.skipWaiting(); });
+self.addEventListener('activate', (e) => {
+  e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))));
+  self.clients.claim();
+});
+self.addEventListener('fetch', (e) => {
+  if (e.request.url.includes('firestore') || e.request.url.includes('firebase') ||
+      e.request.url.includes('googleapis') || e.request.url.includes('gstatic')) return;
+  e.respondWith(caches.match(e.request).then((cached) => {
+    if (cached) return cached;
+    return fetch(e.request).then((res) => {
+      if (!res || res.status !== 200 || res.type !== 'basic') return res;
+      const clone = res.clone();
+      caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
+      return res;
+    });
+  }));
+});`;
+  const swBlob = new Blob([swCode], { type: 'application/javascript' });
+  navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(() => {});
+}
+
+/* ===================================================
+    ユーティリティ
+=================================================== */
+function showLoading(show) {
+  document.getElementById('loading').classList.toggle('active', show);
+}
+
+function showToast(message, type = 'info', duration = 3000) {
+  const container = document.getElementById('toast-container');
+  const id = 'toast_' + Date.now();
+  const el = document.createElement('div');
+  el.id = id; el.className = `toast ${type}`; el.textContent = message;
+  container.appendChild(el);
+  setTimeout(() => {
+    el.classList.add('fade-out');
+    el.addEventListener('animationend', () => el.remove());
+  }, duration);
+}
+
+function navigateTo(screenId) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(screenId).classList.add('active');
+  closeAllMenus();
+}
+
+function closeAllMenus() {
+  document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('show'));
+}
+
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ===================================================
+    認証
+=================================================== */
+onAuthStateChanged(auth, async (user) => {
+  showLoading(true);
+  if (user) {
+    myUID = user.uid;
+    const userDoc = await getDoc(doc(db, "users", myUID));
+    if (userDoc.exists()) {
+      loginUserName = userDoc.data().name;
+      document.getElementById('txt-user-status').textContent = `${loginUserName} さん`;
+      if (inviteGroupId) await joinGroupViaLink(inviteGroupId); else goToGroupScreen();
+    } else {
+      navigateTo('screen-setup-name');
+      showLoading(false);
+    }
+  } else {
+    myUID = loginUserName = "";
+    document.getElementById('input-login-email').value    = "";
+    document.getElementById('input-login-password').value = "";
+    if (groupListUnsubscribe)   { groupListUnsubscribe();   groupListUnsubscribe   = null; }
+    if (activeGroupUnsubscribe) { activeGroupUnsubscribe(); activeGroupUnsubscribe = null; }
+    navigateTo('screen-login');
+    showLoading(false);
+  }
+});
+
+document.getElementById('btn-login').addEventListener('click', async () => {
+  const email    = document.getElementById('input-login-email').value.trim();
+  const password = document.getElementById('input-login-password').value;
+  if (!email || !password) return showToast("メールアドレスとパスワードを入力してください", "warning");
+  showLoading(true);
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+  } catch (err) {
+    const msg = {
+      'auth/user-not-found':  'メールアドレスが登録されていません',
+      'auth/wrong-password':  'パスワードが違います',
+      'auth/invalid-email':   'メールアドレスの形式が正しくありません',
+      'auth/invalid-credential': 'メールアドレスまたはパスワードが違います',
+    }[err.code] || 'ログインに失敗しました: ' + err.message;
+    showToast(msg, "error");
+    showLoading(false);
+  }
+});
+
+document.getElementById('btn-go-register').addEventListener('click', () => {
+  document.getElementById('input-reg-email').value = "";
+  document.getElementById('input-reg-password').value = "";
+  document.getElementById('input-reg-password2').value = "";
+  navigateTo('screen-register');
+});
+document.getElementById('btn-back-to-login-from-register').addEventListener('click', () => navigateTo('screen-login'));
+
+document.getElementById('btn-register').addEventListener('click', async () => {
+  const email = document.getElementById('input-reg-email').value.trim();
+  const pw    = document.getElementById('input-reg-password').value;
+  const pw2   = document.getElementById('input-reg-password2').value;
+  if (!email || !pw)  return showToast("メールアドレスとパスワードを入力してください", "warning");
+  if (pw.length < 6)  return showToast("パスワードは6文字以上にしてください", "warning");
+  if (pw !== pw2)     return showToast("パスワードが一致しません", "warning");
+  showLoading(true);
+  try {
+    await createUserWithEmailAndPassword(auth, email, pw);
+  } catch (err) {
+    const msg = {
+      'auth/email-already-in-use': 'このメールアドレスは既に登録されています',
+      'auth/invalid-email':        'メールアドレスの形式が正しくありません',
+      'auth/weak-password':        'パスワードが弱すぎます（6文字以上にしてください）',
+    }[err.code] || 'アカウント作成に失敗しました: ' + err.message;
+    showToast(msg, "error");
+    showLoading(false);
+  }
+});
+
+document.getElementById('btn-save-name').addEventListener('click', async () => {
+  const name = document.getElementById('input-setup-name').value.trim();
+  if (!name) return showToast("ユーザー名を入力してください", "warning");
+  showLoading(true);
+  try {
+    await setDoc(doc(db, "users", myUID), { name, email: auth.currentUser?.email || "" });
+    loginUserName = name;
+    document.getElementById('txt-user-status').textContent = `${loginUserName} さん`;
+    if (inviteGroupId) await joinGroupViaLink(inviteGroupId); else goToGroupScreen();
+  } catch {
+    showToast("ユーザー名の保存に失敗しました", "error");
+    showLoading(false);
+  }
+});
+
+document.getElementById('btn-logout').addEventListener('click', async () => {
+  if (!confirm("ログアウトしますか？")) return;
+  showLoading(true);
+  try { await signOut(auth); } catch { showToast("ログアウトに失敗しました", "error"); showLoading(false); }
+});
+
+document.getElementById('btn-forgot').addEventListener('click', () => {
+  document.getElementById('input-reset-email').value = document.getElementById('input-login-email').value;
+  navigateTo('screen-reset');
+});
+document.getElementById('btn-back-to-login').addEventListener('click', () => navigateTo('screen-login'));
+document.getElementById('btn-send-reset').addEventListener('click', async () => {
+  const email = document.getElementById('input-reset-email').value.trim();
+  if (!email) return showToast("メールアドレスを入力してください", "warning");
+  showLoading(true);
+  try {
+    await sendPasswordResetEmail(auth, email);
+    showToast("リセットメールを送信しました。メールボックスをご確認ください", "success", 5000);
+    navigateTo('screen-login');
+  } catch (err) {
+    const msg = {
+      'auth/user-not-found': 'このメールアドレスは登録されていません',
+      'auth/invalid-email':  'メールアドレスの形式が正しくありません',
+    }[err.code] || '送信に失敗しました: ' + err.message;
+    showToast(msg, "error");
+  } finally { showLoading(false); }
+});
+
+/* ===================================================
+    グループ管理
+=================================================== */
+function goToGroupScreen() {
+  navigateTo('screen-group');
+  syncGroupList();
+}
+
+function syncGroupList() {
+  if (groupListUnsubscribe) groupListUnsubscribe();
+  showLoading(true);
+  const q = query(collection(db, "groups"), where("members", "array-contains", myUID));
+  groupListUnsubscribe = onSnapshot(q, (snapshot) => {
+    const container = document.getElementById('group-container');
+    container.innerHTML = '';
+    if (snapshot.empty) {
+      container.innerHTML = `
+        <div class="guide-card">
+          <div class="guide-icon">✈️</div>
+          <div class="guide-title">旅の計画をはじめよう！</div>
+          <p class="guide-desc">右下の<strong>「＋」ボタン</strong>から新しい旅行グループを作ろう！友達にURLを送れば一緒に編集できます。</p>
+        </div>`;
+      showLoading(false);
+      return;
+    }
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      const gid  = docSnap.id;
+      const memberCount = Object.keys(data.memberNames || {}).length;
+      const div  = document.createElement('div');
+      div.className = 'group-item';
+      div.innerHTML = `
+        <div class="group-item-body" data-gid="${gid}" data-gname="${escapeHtml(data.name)}">
+          <div class="group-item-name">${escapeHtml(data.name)}</div>
+          <div class="group-item-meta">👤 ${memberCount}人のメンバー</div>
+        </div>
+        <div class="menu-container">
+          <button class="btn-ghost" data-menu="${gid}" aria-label="メニュー">⋮</button>
+          <div class="dropdown-menu" id="menu-${gid}">
+            <div data-action="edit-group" data-gid="${gid}" data-gname="${escapeHtml(data.name)}">編集</div>
+            <div class="menu-delete" data-action="delete-group" data-gid="${gid}">削除</div>
+          </div>
+        </div>`;
+      container.appendChild(div);
+    });
+    showLoading(false);
+  });
+}
+
+document.getElementById('group-container').addEventListener('click', (e) => {
+  const body    = e.target.closest('.group-item-body');
+  const menuBtn = e.target.closest('[data-menu]');
+  const action  = e.target.closest('[data-action]');
+  if (body)    { openGroup(body.dataset.gid, body.dataset.gname); }
+  if (menuBtn) { e.stopPropagation(); const m = document.getElementById(`menu-${menuBtn.dataset.menu}`); const open = m.classList.contains('show'); closeAllMenus(); if(!open) m.classList.add('show'); }
+  if (action)  {
+    e.stopPropagation();
+    if (action.dataset.action === 'edit-group')   openGroupEditModal(action.dataset.gid, action.dataset.gname);
+    if (action.dataset.action === 'delete-group') deleteGroup(action.dataset.gid);
+  }
+});
+
+document.getElementById('btn-open-create-group').addEventListener('click', () => toggleGroupModal(true));
+
+function toggleGroupModal(show) {
+  const modal = document.getElementById('group-modal');
+  if (show) {
+    document.getElementById('new-group-name').value = '';
+    document.getElementById('create-member-name-input').value = '';
+    createTempMembers = [{ id: myUID, name: loginUserName }];
+    renderCreateMembers();
+    modal.classList.add('active');
+  } else {
+    modal.classList.remove('active');
+  }
+}
+
+function renderCreateMembers() {
+  const list = document.getElementById('create-member-list');
+  list.innerHTML = '';
+  createTempMembers.forEach((m, i) => {
+    const tag = document.createElement('div');
+    tag.className = 'member-tag';
+    tag.innerHTML = escapeHtml(m.name) +
+      (m.id !== myUID ? ` <button class="btn-del-member" data-idx="${i}" aria-label="${escapeHtml(m.name)}を削除">×</button>` : '');
+    list.appendChild(tag);
+  });
+}
+
+document.getElementById('create-member-list').addEventListener('click', (e) => {
+  const btn = e.target.closest('.btn-del-member');
+  if (btn) { createTempMembers.splice(parseInt(btn.dataset.idx), 1); renderCreateMembers(); }
+});
+
+document.getElementById('btn-add-member-create').addEventListener('click', () => {
+  const input = document.getElementById('create-member-name-input');
+  const name  = input.value.trim();
+  if (!name) return;
+  createTempMembers.push({ id: "dummy_" + Date.now() + "_" + Math.random().toString(36).substr(2,4), name });
+  input.value = '';
+  renderCreateMembers();
+});
+
+document.getElementById('btn-create-group').addEventListener('click', async () => {
+  const groupName = document.getElementById('new-group-name').value.trim();
+  if (!groupName) return showToast("グループ名を入力してください", "warning");
+  showLoading(true);
+  const newGroupRef = doc(collection(db, "groups"));
+  const membersArray = [], memberNamesMap = {};
+  createTempMembers.forEach(m => { membersArray.push(m.id); memberNamesMap[m.id] = m.name; });
+  await setDoc(newGroupRef, { name: groupName, members: membersArray, memberNames: memberNamesMap, shiori: [], yukisaki: [], okane: [] });
+  toggleGroupModal(false);
+  openGroup(newGroupRef.id, groupName);
+});
+
+document.getElementById('btn-cancel-create-group').addEventListener('click', () => toggleGroupModal(false));
+
+function openGroupEditModal(gid, name) {
+  closeAllMenus();
+  document.getElementById('edit-group-id').value = gid;
+  document.getElementById('input-edit-group-name').value = name;
+  document.getElementById('group-edit-modal').classList.add('active');
+}
+
+document.getElementById('btn-save-group-edit').addEventListener('click', async () => {
+  const gid     = document.getElementById('edit-group-id').value;
+  const newName = document.getElementById('input-edit-group-name').value.trim();
+  if (!newName) return showToast("グループ名を入力してください", "warning");
+  showLoading(true);
+  await updateDoc(doc(db, "groups", gid), { name: newName });
+  document.getElementById('group-edit-modal').classList.remove('active');
+  showLoading(false);
+  showToast("グループ名を更新しました", "success");
+});
+
+document.getElementById('btn-close-group-edit').addEventListener('click', () =>
+  document.getElementById('group-edit-modal').classList.remove('active'));
+
+async function deleteGroup(gid) {
+  closeAllMenus();
+  if (!confirm("本当にこのグループを削除しますか？\n内包されているしおりや支出データもすべて消去されます。")) return;
+  showLoading(true);
+  try {
+    await deleteDoc(doc(db, "groups", gid));
+    showToast("グループを削除しました", "info");
+  } catch { showToast("グループの削除に失敗しました", "error"); }
+  showLoading(false);
+}
+
+async function joinGroupViaLink(groupId) {
+  try {
+    const groupRef  = doc(db, "groups", groupId);
+    const groupSnap = await getDoc(groupRef);
+    if (groupSnap.exists()) {
+      const updates = { members: arrayUnion(myUID) };
+      updates[`memberNames.${myUID}`] = loginUserName;
+      await updateDoc(groupRef, updates);
+      window.history.replaceState({}, document.title, window.location.pathname);
+      openGroup(groupId, groupSnap.data().name);
+    } else {
+      showToast("指定された旅行グループは存在しません", "error");
+      goToGroupScreen();
+    }
+  } catch {
+    showToast("グループへの参加に失敗しました", "error");
+    goToGroupScreen();
+  }
+}
+
+/* ===================================================
+    メイン画面
+=================================================== */
+function openGroup(groupId, groupName) {
+  currentGroupId = groupId;
+  document.getElementById('current-group-title').textContent = groupName;
+  navigateTo('screen-main');
+  if (activeGroupUnsubscribe) activeGroupUnsubscribe();
+  activeGroupUnsubscribe = onSnapshot(doc(db, "groups", groupId), (docSnap) => {
+    if (!docSnap.exists()) return;
+    currentGroupData = docSnap.data();
+    renderContent();
+  });
+}
+
+document.getElementById('btn-back').addEventListener('click', goToGroupScreen);
+document.getElementById('btn-back').addEventListener('keydown', (e) => { if (e.key === 'Enter') goToGroupScreen(); });
+
+document.getElementById('btn-header-menu').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const m = document.getElementById('menu-header');
+  const open = m.classList.contains('show');
+  closeAllMenus();
+  if (!open) m.classList.add('show');
+});
+
+document.getElementById('btn-open-group-settings').addEventListener('click', () => {
+  closeAllMenus();
+  document.getElementById('edit-group-name-input').value  = currentGroupData.name;
+  tempMembers = { ...currentGroupData.memberNames };
+  renderModalMembers();
+  document.getElementById('group-settings-modal').classList.add('active');
+});
+
+function renderModalMembers() {
+  const list = document.getElementById('modal-member-list');
+  list.innerHTML = '';
+  Object.keys(tempMembers).forEach((id) => {
+    const tag = document.createElement('div');
+    tag.className = 'member-tag';
+    tag.innerHTML = escapeHtml(tempMembers[id]) +
+      (id !== myUID ? ` <button class="btn-del-member" data-mid="${id}" aria-label="${escapeHtml(tempMembers[id])}を削除">×</button>` : '');
+    list.appendChild(tag);
+  });
+}
+
+document.getElementById('modal-member-list').addEventListener('click', (e) => {
+  const btn = e.target.closest('.btn-del-member');
+  if (btn) { delete tempMembers[btn.dataset.mid]; renderModalMembers(); }
+});
+
+document.getElementById('btn-add-member-settings').addEventListener('click', () => {
+  const input = document.getElementById('new-member-name-input');
+  const name  = input.value.trim();
+  if (!name) return;
+  tempMembers["dummy_" + Date.now()] = name;
+  input.value = '';
+  renderModalMembers();
+});
+
+document.getElementById('btn-copy-invite').addEventListener('click', () => {
+  const url = `${window.location.origin}${window.location.pathname}?join=${currentGroupId}`;
+  navigator.clipboard.writeText(url).then(
+    () => showToast("招待URLをコピーしました！LINEやインスタで友達に送ろう", "success"),
+    () => showToast("コピーに失敗しました: " + url, "error")
+  );
+});
+
+document.getElementById('btn-save-group-settings').addEventListener('click', async () => {
+  const newName = document.getElementById('edit-group-name-input').value.trim();
+  if (!newName) return showToast("グループ名を入力してください", "warning");
+  showLoading(true);
+  await updateDoc(doc(db, "groups", currentGroupId), {
+    name: newName, members: Object.keys(tempMembers), memberNames: tempMembers
+  });
+  document.getElementById('current-group-title').textContent = newName;
+  document.getElementById('group-settings-modal').classList.remove('active');
+  showLoading(false);
+  showToast("グループ設定を保存しました", "success");
+});
+
+document.getElementById('btn-close-group-settings').addEventListener('click', () =>
+  document.getElementById('group-settings-modal').classList.remove('active'));
+
+/* ===== タブ ===== */
+['tab-shiori','tab-yukisaki','tab-okane'].forEach(tabId => {
+  document.getElementById(tabId).addEventListener('click', () => {
+    const map = { 'tab-shiori': 'しおり', 'tab-yukisaki': '行き先', 'tab-okane': 'お金' };
+    switchTab(map[tabId]);
+  });
+  document.getElementById(tabId).addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.click(); });
+});
+
+function switchTab(tabName) {
+  currentTab = tabName;
+  closeAllMenus();
+  ['しおり','行き先','お金'].forEach((name, i) => {
+    const el = document.getElementById(['tab-shiori','tab-yukisaki','tab-okane'][i]);
+    el.classList.toggle('active', name === tabName);
+    el.setAttribute('aria-selected', name === tabName);
+  });
+  renderContent();
+}
+
+document.addEventListener('click', closeAllMenus);
+
+/* ===================================================
+    コンテンツ描画
+=================================================== */
+function renderContent() {
+  const container = document.getElementById('main-content-area');
+  container.innerHTML = "";
+  if (!currentGroupData) return;
+  if (currentTab === 'しおり')    renderShiori(container);
+  else if (currentTab === '行き先') renderYukisaki(container);
+  else if (currentTab === 'お金')  renderOkane(container);
+}
+
+/* ---- しおり ---- */
+function renderShiori(container) {
+  const list = [...(currentGroupData.shiori || [])].sort((a,b) => {
+    const da = a.day || "1", db2 = b.day || "1";
+    return da !== db2 ? da.localeCompare(db2) : a.time.localeCompare(b.time);
+  });
+  if (list.length === 0) {
+    container.innerHTML = '<div class="empty-state">📅 右下の「＋」ボタンからスケジュールを追加しよう！</div>';
+    return;
+  }
+  const days = {};
+  list.forEach(item => { const d = item.day || "1"; if (!days[d]) days[d] = []; days[d].push(item); });
+  const calDiv = document.createElement('div');
+  calDiv.className = 'calendar-view';
+  Object.keys(days).sort().forEach(day => {
+    const block = document.createElement('div');
+    block.className = 'cal-day-block';
+    block.innerHTML = `<div class="cal-day-header">📅 ${day}日目</div><div class="cal-events" id="cal-events-${day}"></div>`;
+    calDiv.appendChild(block);
+    const eventsDiv = block.querySelector(`#cal-events-${day}`);
+    days[day].forEach(item => {
+      const row = document.createElement('div');
+      row.className = 'cal-event-row';
+      row.innerHTML = `
+        <span class="cal-event-time">${escapeHtml(item.time)}</span>
+        <span class="cal-event-dot"></span>
+        <span class="cal-event-text">${escapeHtml(item.text)}</span>
+        <div class="cal-event-actions">
+          <button class="cal-event-btn" data-action="edit" data-id="${item.id}" aria-label="編集">✏️</button>
+          <button class="cal-event-btn" data-action="delete" data-id="${item.id}" aria-label="削除">🗑️</button>
+        </div>`;
+      eventsDiv.appendChild(row);
+    });
+  });
+  calDiv.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    e.stopPropagation();
+    if (btn.dataset.action === 'edit')   openEditItem(btn.dataset.id);
+    if (btn.dataset.action === 'delete') deleteItem(btn.dataset.id);
+  });
+  container.appendChild(calDiv);
+}
+
+/* ---- 行き先 ---- */
+function renderYukisaki(container) {
+  const datePoll        = currentGroupData.datePoll        || { options:[], deadline:"", finalValue:"" };
+  const budgetPoll      = currentGroupData.budgetPoll      || { options:[], deadline:"", finalValue:"" };
+  const destinationPoll = currentGroupData.destinationPoll || { options:[], deadline:"", finalValue:"" };
+  const statusBar = document.createElement('div');
+  statusBar.className = 'status-bar';
+  statusBar.innerHTML = `
+    <div class="status-cell">
+      <div class="status-cell-label">📅 日程</div>
+      <div class="status-cell-value ${datePoll.finalValue ? 'status-done' : 'status-active'}">${escapeHtml(datePoll.finalValue || '投票中')}</div>
+    </div>
+    <div class="status-divider"></div>
+    <div class="status-cell">
+      <div class="status-cell-label">💴 予算</div>
+      <div class="status-cell-value ${budgetPoll.finalValue ? 'status-done' : datePoll.finalValue ? 'status-active' : 'status-waiting'}">${escapeHtml(budgetPoll.finalValue || (datePoll.finalValue ? '投票中' : '待機'))}</div>
+    </div>
+    <div class="status-divider"></div>
+    <div class="status-cell">
+      <div class="status-cell-label">📍 行先</div>
+      <div class="status-cell-value ${destinationPoll.finalValue ? 'status-done' : budgetPoll.finalValue ? 'status-active' : 'status-waiting'}">${escapeHtml(destinationPoll.finalValue || (budgetPoll.finalValue ? '投票中' : '待機'))}</div>
+    </div>`;
+  container.appendChild(statusBar);
+  if (!datePoll.finalValue) {
+    container.appendChild(buildPollCard('date', 'Step 1: 日程を決めよう！', 'いつ旅行に行くか候補を出し合って投票しましょう！', datePoll, '例: 8/11〜8/13、9月の3連休'));
+  } else if (!budgetPoll.finalValue) {
+    container.appendChild(buildConfirmedBanner(`確定日程: ${datePoll.finalValue}`, () => resetStep('date')));
+    container.appendChild(buildPollCard('budget', 'Step 2: 予算の目安を決めよう！', '1人あたりのおおまかな予算感をすり合わせましょう！', budgetPoll, '例: 3万円以内、5万〜7万'));
+  } else if (!destinationPoll.finalValue) {
+    container.appendChild(buildConfirmedBanner(`日程: ${datePoll.finalValue} ／ 予算: ${budgetPoll.finalValue}`, () => resetStep('budget')));
+    container.appendChild(buildPollCard('destination', 'Step 3: 行きたい国・場所を決めよう！', '決まった日程・予算で行ける目的地を投票で決めましょう！', destinationPoll, '例: 韓国、タイ、北海道、沖縄'));
+  } else {
+    const summary = document.createElement('div');
+    summary.style.cssText = 'background:#f0fdf4;border:1px solid #bbf7d0;border-left:4px solid #10b981;border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.8;margin-bottom:14px;';
+    summary.innerHTML = `
+      <div style="font-weight:700;color:#059669;margin-bottom:6px;font-size:14px;">✅ 前提条件がすべて確定しました！</div>
+      <div>📅 日程: <strong>${escapeHtml(datePoll.finalValue)}</strong></div>
+      <div>💴 予算: <strong>${escapeHtml(budgetPoll.finalValue)}</strong></div>
+      <div>📍 行先: <strong style="color:#0284c7;font-size:15px;">${escapeHtml(destinationPoll.finalValue)}</strong></div>
+      <div style="text-align:right;margin-top:6px;">
+        <button class="btn btn-sm" style="background:#94a3b8;color:#fff;" id="btn-reset-dest">目的地からやり直す</button>
+      </div>`;
+    container.appendChild(summary);
+    document.getElementById('btn-reset-dest')?.addEventListener('click', () => resetStep('destination'));
+    const h4 = document.createElement('h4');
+    h4.style.cssText = 'font-size:14px;margin-bottom:10px;';
+    h4.textContent = `📍 ${destinationPoll.finalValue} で行きたいスポット（いいね順）`;
+    container.appendChild(h4);
+    const yukisakiList = [...(currentGroupData.yukisaki || [])].sort((a,b) => (b.likes||[]).length - (a.likes||[]).length);
+    if (yukisakiList.length === 0) {
+      container.innerHTML += '<div class="empty-state">右下の「＋」ボタンを押して、行きたいスポットを追加しよう！</div>';
+    }
+    yukisakiList.forEach(item => {
+      const likes   = item.likes || [];
+      const isLiked = likes.includes(myUID);
+      const mapQuery = encodeURIComponent(item.name);
+      const itemDiv  = document.createElement('div');
+      itemDiv.className = 'list-item';
+      itemDiv.innerHTML = `
+        <button class="btn-like ${isLiked ? 'liked' : ''}" data-spotid="${item.id}" aria-label="${isLiked ? 'いいね解除' : 'いいね'}">
+          <span style="font-size:14px;">${isLiked ? '❤️' : '🤍'}</span><span>${likes.length}</span>
+        </button>
+        <div class="item-data" style="padding-left:8px;">
+          <strong>${escapeHtml(item.name)}</strong>
+          ${item.url ? `<br><a href="${escapeHtml(item.url)}" target="_blank" rel="noopener" class="spot-map-btn">🔗 参考リンク</a>` : ''}
+          <br><a href="https://maps.google.com/maps?q=${mapQuery}" target="_blank" rel="noopener" class="spot-map-btn">🗺 地図で見る</a>
+        </div>
+        <div class="menu-container">
+          <button class="btn-ghost" data-menu="${item.id}" aria-label="メニュー">⋮</button>
+          <div class="dropdown-menu" id="menu-${item.id}">
+            <div data-action="edit-item" data-id="${item.id}">編集</div>
+            <div class="menu-delete" data-action="delete-item" data-id="${item.id}">削除</div>
+          </div>
+        </div>`;
+      container.appendChild(itemDiv);
+    });
+    container.addEventListener('click', (e) => {
+      const likeBtn  = e.target.closest('.btn-like[data-spotid]');
+      const menuBtn  = e.target.closest('[data-menu]');
+      const actionEl = e.target.closest('[data-action]');
+      if (likeBtn)  toggleSpotLike(likeBtn.dataset.spotid);
+      if (menuBtn)  { e.stopPropagation(); const m = document.getElementById(`menu-${menuBtn.dataset.menu}`); const open = m.classList.contains('show'); closeAllMenus(); if(!open) m.classList.add('show'); }
+      if (actionEl) {
+        e.stopPropagation();
+        if (actionEl.dataset.action === 'edit-item')   openEditItem(actionEl.dataset.id);
+        if (actionEl.dataset.action === 'delete-item') deleteItem(actionEl.dataset.id);
+      }
+    });
+  }
+}
+
+/* ---- お金タブ ---- */
+function renderOkane(container) {
+  const memberIds  = Object.keys(currentGroupData.memberNames || {});
+  const okaneList  = currentGroupData.okane || [];
+  let total = 0;
+
+  // 各メンバーの「支払い合計」と「負担合計」を集計
+  const memberPaid  = {}; // 実際に払った額
+  const memberOwes  = {}; // 本来負担すべき額
+  memberIds.forEach(id => { memberPaid[id] = 0; memberOwes[id] = 0; });
+
+  okaneList.forEach(e => {
+    total += e.amount;
+    if (memberPaid[e.uid] !== undefined) memberPaid[e.uid] += e.amount;
+
+    // splitsがある場合はその分を負担額に加算
+    if (e.splits && Object.keys(e.splits).length > 0) {
+      Object.entries(e.splits).forEach(([uid, amt]) => {
+        if (memberOwes[uid] !== undefined) memberOwes[uid] += amt;
+      });
+    } else {
+      // 旧データ or splits未指定 → 全員均等
+      const share = Math.round(e.amount / memberIds.length);
+      memberIds.forEach(id => { memberOwes[id] += share; });
+    }
+  });
+
+  // 差額 = 払った額 - 負担すべき額
+  const diffMap = {};
+  memberIds.forEach(id => diffMap[id] = memberPaid[id] - memberOwes[id]);
+
+  const perPersonAvg = memberIds.length > 0 ? Math.round(total / memberIds.length) : 0;
+
+  // サマリーカード
+  const summaryDiv = document.createElement('div');
+  summaryDiv.className = 'money-summary';
+  summaryDiv.innerHTML = `
+    <div class="money-summary-row"><span>合計支出</span><span>1人あたり平均</span></div>
+    <div class="money-summary-row">
+      <span class="money-summary-total">¥${total.toLocaleString()}</span>
+      <span class="money-summary-total">¥${perPersonAvg.toLocaleString()}</span>
+    </div>`;
+  container.appendChild(summaryDiv);
+
+  // メンバーカード
+  if (memberIds.length > 0) {
+    const grid = document.createElement('div');
+    grid.className = 'money-member-grid';
+    memberIds.forEach(id => {
+      const name = currentGroupData.memberNames[id] || "不明";
+      const diff = diffMap[id];
+      const card = document.createElement('div');
+      card.className = 'money-member-card';
+      card.innerHTML = `
+        <div class="money-member-name">${escapeHtml(name)}</div>
+        <div class="money-member-paid">¥${(memberPaid[id]||0).toLocaleString()} 支払い</div>
+        <div style="font-size:11px;color:var(--c-muted);">負担 ¥${(memberOwes[id]||0).toLocaleString()}</div>
+        <div class="money-member-diff ${diff >= 0 ? 'diff-positive' : 'diff-negative'}">
+          ${diff >= 0 ? `+${diff.toLocaleString()}円 受取` : `${diff.toLocaleString()}円 支払`}
+        </div>`;
+      grid.appendChild(card);
+    });
+    container.appendChild(grid);
+
+    // 清算フロー
+    const routes = calculateSettlementRoutes(diffMap, currentGroupData.memberNames || {});
+    if (routes.length > 0) {
+      const graphDiv = document.createElement('div');
+      graphDiv.className = 'settlement-graph';
+      graphDiv.innerHTML = `<div class="settlement-graph-title">💸 おすすめの清算方法</div>`;
+      routes.forEach(r => {
+        const routeEl = document.createElement('div');
+        routeEl.className = 'settlement-route';
+        routeEl.innerHTML = `
+          <span class="settlement-from">${escapeHtml(r.from)}</span>
+          <span class="settlement-arrow">→</span>
+          <span class="settlement-to">${escapeHtml(r.to)}</span>
+          <span class="settlement-amount">¥${r.amount.toLocaleString()}</span>`;
+        graphDiv.appendChild(routeEl);
+      });
+      container.appendChild(graphDiv);
+    } else if (total > 0) {
+      const noRoute = document.createElement('p');
+      noRoute.style.cssText = 'font-size:13px;color:var(--c-green);text-align:center;padding:8px;';
+      noRoute.textContent = '✅ 清算不要です！全員の負担が均等です。';
+      container.appendChild(noRoute);
+    }
+  }
+
+  // 支払い履歴
+  const h4 = document.createElement('h4');
+  h4.style.cssText = 'font-size:13px;font-weight:700;color:var(--c-muted);margin:14px 0 8px;';
+  h4.textContent = '支払い履歴';
+  container.appendChild(h4);
+
+  if (okaneList.length === 0) {
+    container.innerHTML += '<div class="empty-state">💰 右下の「＋」ボタンから支払いを記録しよう！</div>';
+  }
+
+  okaneList.forEach(item => {
+    const payerName = currentGroupData.memberNames[item.uid] || "不明";
+    const memberNames = currentGroupData.memberNames || {};
+
+    // 割り勘内訳バッジを生成
+    let splitHTML = '';
+    if (item.splits && Object.keys(item.splits).length > 0) {
+      const badges = Object.entries(item.splits)
+        .filter(([, amt]) => amt > 0)
+        .map(([uid, amt]) => {
+          const n = memberNames[uid] || '不明';
+          return `<span class="split-detail-badge">${escapeHtml(n)} ¥${Math.round(amt).toLocaleString()}</span>`;
+        }).join('');
+      splitHTML = `<div style="margin-top:5px;">${badges}</div>`;
+    } else {
+      // 旧データ：全員均等と表示
+      const share = memberIds.length > 0 ? Math.round(item.amount / memberIds.length) : 0;
+      const badges = memberIds.map(uid => {
+        const n = memberNames[uid] || '不明';
+        return `<span class="split-detail-badge">${escapeHtml(n)} ¥${share.toLocaleString()}</span>`;
+      }).join('');
+      splitHTML = `<div style="margin-top:5px;">${badges}</div>`;
+    }
+
+    const itemDiv = createListItemEl(item.id, `
+      <strong>${escapeHtml(payerName)}</strong> が <strong>¥${item.amount.toLocaleString()}</strong> 支払い<br>
+      <span style="font-size:12px;color:var(--c-muted);">（${escapeHtml(item.text)}）</span>
+      ${splitHTML}
+    `);
+    container.appendChild(itemDiv);
+  });
+}
+
+function calculateSettlementRoutes(diffMap, memberNames) {
+  let debits  = [], credits = [];
+  Object.keys(diffMap).forEach(id => {
+    const amt = diffMap[id];
+    if (amt < -1) debits.push({ id, amount: Math.abs(amt) });
+    else if (amt > 1) credits.push({ id, amount: amt });
+  });
+  const routes = [];
+  let i = 0, j = 0;
+  while (i < debits.length && j < credits.length) {
+    const deb = debits[i], cre = credits[j];
+    const settled = Math.min(deb.amount, cre.amount);
+    routes.push({ from: memberNames[deb.id]||"不明", to: memberNames[cre.id]||"不明", amount: Math.round(settled) });
+    deb.amount -= settled; cre.amount -= settled;
+    if (deb.amount <= 1) i++;
+    if (cre.amount <= 1) j++;
+  }
+  return routes;
+}
+
+/* ===================================================
+    投票UI ビルダー
+=================================================== */
+function buildPollCard(type, title, desc, poll, placeholder) {
+  const card = document.createElement('div');
+  card.className = 'poll-card';
+  const isExpiredGlobal = poll.deadline ? (new Date(poll.deadline) < new Date()) : false;
+  const totalVotes = (poll.options || []).reduce((s,o) => s + (o.votes||[]).length, 0);
+  let optionsHTML = '';
+  if ((poll.options||[]).length > 0) {
+    poll.options.forEach(opt => {
+      const votes    = opt.votes || [];
+      const pct      = totalVotes > 0 ? Math.round(votes.length / totalVotes * 100) : 0;
+      const hasVoted = votes.includes(myUID);
+      optionsHTML += `
+        <div class="poll-option ${hasVoted ? 'voted' : ''}">
+          <div class="poll-option-info">
+            <div class="poll-option-name">${escapeHtml(opt.name)}</div>
+            <div class="poll-option-votes">${votes.length} 票 (${pct}%)</div>
+            <div class="poll-option-bar"><div class="poll-option-bar-fill" style="width:${pct}%"></div></div>
+          </div>
+          <div class="poll-option-actions">
+            <button class="btn btn-sm ${hasVoted ? 'btn-success' : 'btn-primary'}"
+              data-action="vote" data-type="${type}" data-optid="${opt.id}"
+              ${isExpiredGlobal ? 'disabled style="background:#cbd5e1;cursor:not-allowed;"' : ''}
+              aria-pressed="${hasVoted}">${hasVoted ? '✅' : '投票'}</button>
+            <button class="btn btn-sm" style="background:#f59e0b;color:#fff;"
+              data-action="finalize" data-type="${type}" data-optname="${escapeHtml(opt.name)}">確定</button>
+            <button class="btn btn-sm btn-danger"
+              data-action="del-option" data-type="${type}" data-optid="${opt.id}">削</button>
+          </div>
+        </div>`;
+    });
+  } else {
+    optionsHTML = '<p style="font-size:13px;color:var(--c-muted);text-align:center;padding:12px 0;background:#f8fafc;border-radius:8px;">候補がまだありません</p>';
+  }
+  const dlClass = !poll.deadline ? 'none' : isExpiredGlobal ? 'expired' : 'active';
+  const dlText  = !poll.deadline ? '未設定' : `${poll.deadline.replace('T',' ')} ${isExpiredGlobal ? '（締切）' : ''}`;
+  card.innerHTML = `
+    <div class="poll-title">${title}</div>
+    <div class="poll-desc">${desc}</div>
+    <div class="poll-deadline ${dlClass}">⏰ 投票期限: ${dlText}</div>
+    ${optionsHTML}
+    <hr class="poll-separator">
+    <div class="poll-section-label">候補を追加</div>
+    <div class="poll-row">
+      <input type="text" id="input-poll-${type}" placeholder="${placeholder}">
+      <button class="btn btn-primary btn-sm" data-action="add-option" data-type="${type}">追加</button>
+    </div>
+    <div class="poll-section-label">投票期限の設定</div>
+    <div class="poll-row">
+      <input type="datetime-local" id="input-deadline-${type}" value="${poll.deadline||''}">
+      <button class="btn btn-sm" style="background:#64748b;color:#fff;" data-action="set-deadline" data-type="${type}">設定</button>
+    </div>
+    <div class="poll-section-label">自由入力で直接決定</div>
+    <div class="poll-row">
+      <input type="text" id="input-direct-${type}" placeholder="候補にない項目を直接決める場合">
+      <button class="btn btn-sm" style="background:#f59e0b;color:#fff;" data-action="direct-finalize" data-type="${type}">決定</button>
+    </div>`;
+  card.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-action]');
+    if (!el) return;
+    const t = el.dataset.type;
+    if (el.dataset.action === 'vote')            voteStepOption(t, el.dataset.optid);
+    if (el.dataset.action === 'finalize')        setStepFinal(t, el.dataset.optname);
+    if (el.dataset.action === 'del-option')      deleteStepOption(t, el.dataset.optid);
+    if (el.dataset.action === 'add-option')      addStepOption(t);
+    if (el.dataset.action === 'set-deadline')    saveStepDeadline(t);
+    if (el.dataset.action === 'direct-finalize') {
+      const v = document.getElementById(`input-direct-${t}`)?.value.trim();
+      if (v) setStepFinal(t, v);
+    }
+  });
+  return card;
+}
+
+function buildConfirmedBanner(text, onReset) {
+  const div = document.createElement('div');
+  div.className = 'confirmed-banner';
+  div.innerHTML = `<span>${escapeHtml(text)}</span><button class="btn btn-sm" style="background:#94a3b8;color:#fff;flex-shrink:0;">やり直す</button>`;
+  div.querySelector('button').addEventListener('click', onReset);
+  return div;
+}
+
+/* ===================================================
+    割り勘フォーム UI
+=================================================== */
+
+// モードトグル
+document.getElementById('btn-split-even').addEventListener('click', () => setSplitMode('even'));
+document.getElementById('btn-split-manual').addEventListener('click', () => setSplitMode('manual'));
+
+function setSplitMode(mode) {
+  splitMode = mode;
+  document.getElementById('btn-split-even').classList.toggle('active', mode === 'even');
+  document.getElementById('btn-split-manual').classList.toggle('active', mode === 'manual');
+  document.getElementById('split-even-section').classList.toggle('visible', mode === 'even');
+  document.getElementById('split-manual-section').classList.toggle('visible', mode === 'manual');
+  if (mode === 'manual') updateManualTotal();
+}
+
+// 均等割りのチェックボックス描画
+function renderSplitCheckboxes(memberNames, checkedIds = null) {
+  const container = document.getElementById('split-member-checkboxes');
+  container.innerHTML = '';
+  const ids = Object.keys(memberNames);
+  const defaultChecked = checkedIds || ids; // デフォルト全員チェック
+
+  ids.forEach(uid => {
+    const name    = memberNames[uid];
+    const checked = defaultChecked.includes(uid);
+    const row     = document.createElement('label');
+    row.className = 'split-member-row';
+    row.innerHTML = `
+      <input type="checkbox" data-uid="${uid}" ${checked ? 'checked' : ''}>
+      <span class="split-member-label">${escapeHtml(name)}</span>
+      <span class="split-member-share" id="share-${uid}">—</span>`;
+    container.appendChild(row);
+  });
+
+  // チェック変更でプレビュー更新
+  container.addEventListener('change', updateEvenPreview);
+  updateEvenPreview();
+}
+
+// 均等割りプレビュー更新
+function updateEvenPreview() {
+  const amount  = parseInt(document.getElementById('input-money-amount').value) || 0;
+  const checked = getCheckedUids();
+  const count   = checked.length;
+  const share   = count > 0 ? Math.floor(amount / count) : 0;
+  const rem     = count > 0 ? amount - share * count : 0;
+
+  // 各行に金額を表示
+  document.querySelectorAll('#split-member-checkboxes input[data-uid]').forEach((cb, i) => {
+    const uid   = cb.dataset.uid;
+    const el    = document.getElementById(`share-${uid}`);
+    if (!el) return;
+    if (!cb.checked) { el.textContent = '—'; return; }
+    // 最後の人に端数を加算
+    const isLast = checked[checked.length - 1] === uid;
+    el.textContent = `¥${(isLast ? share + rem : share).toLocaleString()}`;
+  });
+
+  const preview = document.getElementById('split-even-preview');
+  if (count === 0) {
+    preview.textContent = '対象者を選んでください';
+  } else if (amount === 0) {
+    preview.textContent = '金額を入力してください';
+  } else {
+    preview.textContent = `${count}人で割り勘 → 1人あたり ¥${share.toLocaleString()}${rem > 0 ? `（最後の人は +¥${rem}）` : ''}`;
+  }
+}
+
+function getCheckedUids() {
+  return [...document.querySelectorAll('#split-member-checkboxes input[data-uid]:checked')]
+    .map(cb => cb.dataset.uid);
+}
+
+// 手動入力欄の描画
+function renderManualInputs(memberNames, existingSplits = {}) {
+  const container = document.getElementById('split-manual-inputs');
+  container.innerHTML = '';
+  Object.entries(memberNames).forEach(([uid, name]) => {
+    const val = existingSplits[uid] || 0;
+    const row = document.createElement('div');
+    row.className = 'split-manual-row';
+    row.innerHTML = `
+      <label title="${escapeHtml(name)}">${escapeHtml(name.length > 5 ? name.slice(0,5)+'…' : name)}</label>
+      <input type="number" data-uid="${uid}" value="${val}" min="0" placeholder="0">
+      <span class="yen-label">円</span>`;
+    container.appendChild(row);
+  });
+  container.addEventListener('input', updateManualTotal);
+  updateManualTotal();
+}
+
+// 手動入力の合計チェック
+function updateManualTotal() {
+  const total = parseInt(document.getElementById('input-money-amount').value) || 0;
+  const inputs = document.querySelectorAll('#split-manual-inputs input[data-uid]');
+  let sum = 0;
+  inputs.forEach(inp => sum += parseInt(inp.value) || 0);
+  const el = document.getElementById('split-manual-total');
+  const diff = sum - total;
+  if (total === 0) {
+    el.innerHTML = `<span>入力合計</span><span>金額を入力してください</span>`;
+  } else if (diff === 0) {
+    el.innerHTML = `<span>入力合計</span><span class="total-ok">¥${sum.toLocaleString()} ✅ ぴったり！</span>`;
+  } else {
+    el.innerHTML = `<span>入力合計</span><span class="total-ng">¥${sum.toLocaleString()} （${diff > 0 ? '+' : ''}${diff.toLocaleString()}円 ズレあり）</span>`;
+  }
+}
+
+// 金額入力時にプレビューも更新
+document.getElementById('input-money-amount').addEventListener('input', () => {
+  if (splitMode === 'even') updateEvenPreview();
+  if (splitMode === 'manual') updateManualTotal();
+});
+
+/* ===================================================
+    アイテム CRUD
+=================================================== */
+document.getElementById('btn-add-item').addEventListener('click', openItemModal);
+
+function openItemModal() {
+  if (currentTab === '行き先') {
+    const dp = currentGroupData.datePoll || {}, bp = currentGroupData.budgetPoll || {}, de = currentGroupData.destinationPoll || {};
+    if (!dp.finalValue || !bp.finalValue || !de.finalValue) {
+      showToast("Step 1〜3 の前提（日程・予算・目的地）がすべて確定してからスポットを追加できます！", "warning");
+      return;
+    }
+  }
+  document.getElementById('edit-id').value = '';
+  document.getElementById('item-modal-title').textContent = `${currentTab}の追加`;
+  ['form-shiori','form-yukisaki','form-okane'].forEach(id => {
+    document.getElementById(id).style.display = 'none';
+  });
+  const formMap = { 'しおり': 'form-shiori', '行き先': 'form-yukisaki', 'お金': 'form-okane' };
+  document.getElementById(formMap[currentTab]).style.display = 'block';
+
+  if (currentTab === 'しおり')  { document.getElementById('input-shiori-text').value = ''; document.getElementById('input-shiori-day').value = '1'; }
+  if (currentTab === '行き先')  { document.getElementById('input-spot-name').value = ''; document.getElementById('input-spot-url').value = ''; }
+  if (currentTab === 'お金') {
+    const sel = document.getElementById('input-money-name');
+    sel.innerHTML = '';
+    Object.entries(currentGroupData?.memberNames || {}).forEach(([uid, name]) => {
+      const opt = document.createElement('option');
+      opt.value = uid; opt.textContent = name;
+      sel.appendChild(opt);
+    });
+    document.getElementById('input-money-amount').value = '';
+    document.getElementById('input-money-text').value   = '';
+
+    // 均等割りモードでリセット
+    setSplitMode('even');
+    renderSplitCheckboxes(currentGroupData?.memberNames || {});
+    renderManualInputs(currentGroupData?.memberNames || {});
+  }
+  document.getElementById('item-modal').classList.add('active');
+}
+
+function openEditItem(id) {
+  openItemModal();
+  document.getElementById('edit-id').value = id;
+  document.getElementById('item-modal-title').textContent = `${currentTab}の編集`;
+  if (currentTab === 'しおり') {
+    const item = currentGroupData.shiori.find(i => i.id === id);
+    if (item) { document.getElementById('input-shiori-day').value = item.day||"1"; document.getElementById('input-time').value = item.time; document.getElementById('input-shiori-text').value = item.text; }
+  } else if (currentTab === '行き先') {
+    const item = currentGroupData.yukisaki.find(i => i.id === id);
+    if (item) { document.getElementById('input-spot-name').value = item.name; document.getElementById('input-spot-url').value = item.url||''; }
+  } else if (currentTab === 'お金') {
+    const item = (currentGroupData.okane||[]).find(i => i.id === id);
+    if (item) {
+      document.getElementById('input-money-name').value   = item.uid;
+      document.getElementById('input-money-amount').value = item.amount;
+      document.getElementById('input-money-text').value   = item.text;
+
+      const memberNames = currentGroupData.memberNames || {};
+      if (item.splits && Object.keys(item.splits).length > 0) {
+        // 既存データのsplitsを元にモードを判定
+        const memberCount = Object.keys(memberNames).length;
+        const splitCount  = Object.keys(item.splits).filter(uid => item.splits[uid] > 0).length;
+        const allSame     = Object.values(item.splits).every(v => v === Object.values(item.splits)[0]);
+
+        if (allSame && splitCount === memberCount) {
+          // 均等割りだった
+          setSplitMode('even');
+          const checkedIds = Object.keys(item.splits).filter(uid => item.splits[uid] > 0);
+          renderSplitCheckboxes(memberNames, checkedIds);
+          renderManualInputs(memberNames, item.splits);
+        } else {
+          // 手動割りだった
+          setSplitMode('manual');
+          renderSplitCheckboxes(memberNames);
+          renderManualInputs(memberNames, item.splits);
+        }
+      } else {
+        setSplitMode('even');
+        renderSplitCheckboxes(memberNames);
+        renderManualInputs(memberNames);
+      }
+      updateEvenPreview();
+    }
+  }
+}
+
+document.getElementById('btn-save-item').addEventListener('click', saveItem);
+document.getElementById('btn-cancel-item').addEventListener('click', () => document.getElementById('item-modal').classList.remove('active'));
+
+async function saveItem() {
+  const idInput = document.getElementById('edit-id').value;
+  const isEdit  = idInput !== '';
+  const itemId  = isEdit ? idInput : "item_" + Date.now();
+
+  let shioriList   = [...(currentGroupData.shiori   || [])];
+  let yukisakiList = [...(currentGroupData.yukisaki || [])];
+  let okaneList    = [...(currentGroupData.okane    || [])];
+
+  if (currentTab === 'しおり') {
+    const day  = document.getElementById('input-shiori-day').value;
+    const time = document.getElementById('input-time').value;
+    const text = document.getElementById('input-shiori-text').value.trim();
+    if (!text) return showToast("内容を入力してください", "warning");
+    if (isEdit) { const i = shioriList.find(i => i.id === itemId); if(i){ i.day=day; i.time=time; i.text=text; } }
+    else shioriList.push({ id: itemId, day, time, text });
+
+  } else if (currentTab === '行き先') {
+    const name = document.getElementById('input-spot-name').value.trim();
+    const url  = document.getElementById('input-spot-url').value.trim();
+    if (!name) return showToast("スポット名を入力してください", "warning");
+    if (isEdit) { const i = yukisakiList.find(i => i.id === itemId); if(i){ i.name=name; i.url=url; if(!i.likes)i.likes=[]; } }
+    else yukisakiList.push({ id: itemId, name, url, likes: [] });
+
+  } else if (currentTab === 'お金') {
+    const uid    = document.getElementById('input-money-name').value;
+    const amount = parseInt(document.getElementById('input-money-amount').value);
+    const text   = document.getElementById('input-money-text').value.trim();
+    if (!uid || isNaN(amount) || amount <= 0) return showToast("金額を正しく入力してください", "warning");
+
+    // splits を構築
+    let splits = {};
+    if (splitMode === 'even') {
+      const checkedUids = getCheckedUids();
+      if (checkedUids.length === 0) return showToast("割り勘の対象者を選んでください", "warning");
+      const share = Math.floor(amount / checkedUids.length);
+      const rem   = amount - share * checkedUids.length;
+      checkedUids.forEach((u, idx) => {
+        splits[u] = idx === checkedUids.length - 1 ? share + rem : share;
+      });
+    } else {
+      // 手動モード
+      const inputs = document.querySelectorAll('#split-manual-inputs input[data-uid]');
+      let sum = 0;
+      inputs.forEach(inp => {
+        const v = parseInt(inp.value) || 0;
+        splits[inp.dataset.uid] = v;
+        sum += v;
+      });
+      if (Math.abs(sum - amount) > 0) {
+        return showToast(`合計金額（¥${amount.toLocaleString()}）と負担額の合計（¥${sum.toLocaleString()}）が一致しません。確認してください。`, "warning");
+      }
+    }
+
+    const newEntry = { id: itemId, uid, amount, text, splits };
+    if (isEdit) {
+      const idx = okaneList.findIndex(i => i.id === itemId);
+      if (idx >= 0) okaneList[idx] = newEntry;
+    } else {
+      okaneList.push(newEntry);
+    }
+  }
+
+  showLoading(true);
+  try {
+    await updateDoc(doc(db, "groups", currentGroupId), { shiori: shioriList, yukisaki: yukisakiList, okane: okaneList });
+    document.getElementById('item-modal').classList.remove('active');
+    showToast("保存しました", "success");
+  } catch {
+    showToast("データの保存に失敗しました。通信環境などを確認してください。", "error");
+  } finally { showLoading(false); }
+}
+
+async function deleteItem(id) {
+  if (!confirm("本当に削除しますか？")) return;
+  showLoading(true);
+  try {
+    await updateDoc(doc(db, "groups", currentGroupId), {
+      shiori:   (currentGroupData.shiori   || []).filter(i => i.id !== id),
+      yukisaki: (currentGroupData.yukisaki || []).filter(i => i.id !== id),
+      okane:    (currentGroupData.okane    || []).filter(i => i.id !== id),
+    });
+    showToast("削除しました", "info");
+  } catch { showToast("削除に失敗しました", "error"); }
+  finally  { showLoading(false); }
+}
+
+async function toggleSpotLike(spotId) {
+  showLoading(true);
+  try {
+    const updated = [...(currentGroupData.yukisaki||[])].map(item => {
+      if (item.id !== spotId) return item;
+      const likes = [...(item.likes||[])];
+      const idx   = likes.indexOf(myUID);
+      if (idx >= 0) likes.splice(idx, 1); else likes.push(myUID);
+      return { ...item, likes };
+    });
+    await updateDoc(doc(db, "groups", currentGroupId), { yukisaki: updated });
+  } catch { showToast("いいねの更新に失敗しました", "error"); }
+  finally  { showLoading(false); }
+}
+
+/* ===================================================
+    投票操作
+=================================================== */
+async function addStepOption(type) {
+  const input = document.getElementById(`input-poll-${type}`);
+  const name  = input.value.trim();
+  if (!name) return showToast("候補の名前を入力してください", "warning");
+  showLoading(true);
+  const pollKey = `${type}Poll`;
+  const poll    = currentGroupData[pollKey] || { options:[], deadline:"", finalValue:"" };
+  if (!poll.options) poll.options = [];
+  poll.options.push({ id: `opt_${type}_${Date.now()}`, name, votes: [] });
+  await updateDoc(doc(db, "groups", currentGroupId), { [pollKey]: poll });
+  input.value = '';
+  showLoading(false);
+}
+
+async function voteStepOption(type, optId) {
+  showLoading(true);
+  const pollKey = `${type}Poll`;
+  const poll = { ...currentGroupData[pollKey] };
+  if (poll.deadline && new Date(poll.deadline) < new Date()) {
+    showLoading(false);
+    return showToast("投票期限が過ぎています", "warning");
+  }
+  poll.options = poll.options.map(opt => {
+    if (opt.id !== optId) return opt;
+    const votes = [...(opt.votes||[])];
+    const idx   = votes.indexOf(myUID);
+    if (idx >= 0) votes.splice(idx,1); else votes.push(myUID);
+    return { ...opt, votes };
+  });
+  await updateDoc(doc(db, "groups", currentGroupId), { [pollKey]: poll });
+  showLoading(false);
+}
+
+async function deleteStepOption(type, optId) {
+  if (!confirm("この候補を削除しますか？")) return;
+  showLoading(true);
+  const pollKey = `${type}Poll`;
+  const poll = { ...currentGroupData[pollKey] };
+  poll.options = poll.options.filter(opt => opt.id !== optId);
+  await updateDoc(doc(db, "groups", currentGroupId), { [pollKey]: poll });
+  showLoading(false);
+}
+
+async function saveStepDeadline(type) {
+  const deadline = document.getElementById(`input-deadline-${type}`)?.value;
+  if (!deadline) return showToast("期限となる日時を入力してください", "warning");
+  showLoading(true);
+  const pollKey = `${type}Poll`;
+  const poll = currentGroupData[pollKey] || { options:[], deadline:"", finalValue:"" };
+  poll.deadline = deadline;
+  await updateDoc(doc(db, "groups", currentGroupId), { [pollKey]: poll });
+  showLoading(false);
+  showToast("投票期限を設定しました", "success");
+}
+
+async function setStepFinal(type, value) {
+  if (!value) return showToast("確定する項目を入力してください", "warning");
+  if (!confirm(`「${value}」に確定して次のステップへ進みますか？`)) return;
+  showLoading(true);
+  const pollKey = `${type}Poll`;
+  const poll = currentGroupData[pollKey] || { options:[], deadline:"", finalValue:"" };
+  poll.finalValue = value;
+  await updateDoc(doc(db, "groups", currentGroupId), { [pollKey]: poll });
+  showLoading(false);
+}
+
+async function resetStep(type) {
+  if (!confirm("このステップの設定を解除して、アンケートをやり直しますか？\n※これ以降のステップで確定したデータも一度未定に戻ります。")) return;
+  showLoading(true);
+  const updates = {};
+  if (type === 'date')             { updates['datePoll.finalValue'] = ""; updates['budgetPoll.finalValue'] = ""; updates['destinationPoll.finalValue'] = ""; }
+  else if (type === 'budget')      { updates['budgetPoll.finalValue'] = ""; updates['destinationPoll.finalValue'] = ""; }
+  else if (type === 'destination') { updates['destinationPoll.finalValue'] = ""; }
+  await updateDoc(doc(db, "groups", currentGroupId), updates);
+  showLoading(false);
+}
+
+/* ===================================================
+    ヘルパー
+=================================================== */
+function createListItemEl(id, innerHTML) {
+  const div = document.createElement('div');
+  div.className = 'list-item';
+  div.innerHTML = `
+    <div class="item-data">${innerHTML}</div>
+    <div class="menu-container">
+      <button class="btn-ghost" data-menu2="${id}" aria-label="メニュー">⋮</button>
+      <div class="dropdown-menu" id="menu-${id}">
+        <div data-action2="edit"   data-id="${id}">編集</div>
+        <div class="menu-delete" data-action2="delete" data-id="${id}">削除</div>
+      </div>
+    </div>`;
+  div.addEventListener('click', (e) => {
+    const menuBtn = e.target.closest('[data-menu2]');
+    const action  = e.target.closest('[data-action2]');
+    if (menuBtn) { e.stopPropagation(); const m = document.getElementById(`menu-${menuBtn.dataset.menu2}`); const open = m.classList.contains('show'); closeAllMenus(); if(!open) m.classList.add('show'); }
+    if (action)  { e.stopPropagation(); if(action.dataset.action2==='edit') openEditItem(action.dataset.id); if(action.dataset.action2==='delete') deleteItem(action.dataset.id); }
+  });
+  return div;
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  ['item-modal','group-modal','group-edit-modal','group-settings-modal'].forEach(id => {
+    document.getElementById(id).classList.remove('active');
+  });
+});
+</script>
+</body>
+</html>
